@@ -1,4 +1,3 @@
-
 import access.JpaAccessHolder;
 import entitytype.EntityTypeSelection;
 import entitytype.generator.DatabaseStringGenerator;
