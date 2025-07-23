@@ -11,5 +11,6 @@
     <modules>
         <module>core</module>
         <module>fx-logic</module>
+        <module>fx-gui</module>
     </modules>
 </project>
