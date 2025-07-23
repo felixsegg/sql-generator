@@ -13,16 +13,16 @@ public interface EntityTypeSelection {
      DomainStringGenerator DEF_DOMAIN_STRING_GENERATOR = DomainStringGeneratorImpl.getInstance();
      DatabaseStringGenerator DEF_DATABASE_STRING_GENERATOR = DatabaseStringGeneratorImpl.getInstance();
      String DEF_PROMPT_PREFIX = """
-            Es folgen ein benutzerdefinierter Prompt, ein strukturierter String, der eine JPA-Metamodell-Repräsentation enthält und ein String, der ein PostgreSQL-Schema-Repräsentation auf die die JPA-Implementierung das Metamodell abbildet enthält.
-            Generiere mir bitte ein SQL-SELECT-Statement, das der folgenden, auf dem objektorientierten Domänenmodell in menschlicher Sprache verfassten Abfrage entspricht:
-            \"""";
+             This is followed by a user-defined prompt, a structured string containing a JPA metamodel representation, and a string containing a SQL schema representation to which the JPA implementation maps the metamodel.
+             Please generate an SQL SELECT statement that corresponds to the following query written in human language based on the object-oriented domain model:
+             \"""";
      String DEF_PROMPT_POSTFIX = """
             ".
-            Bitte gib ausschließlich den entsprechenden SQL-Code aus, sonst nichts, keine weiteren Kommentare deinerseits. Auch keine Markdownelemente, um den Output als SQL zu kennzeichnen oder Ähnliches.
-            Achte bitte darauf, dass es sich garantiert um einen SELECT-Ausdruck handelt, auch wenn es in der Abfrage anders gefordert sein sollte.
-            Wenn es angebracht ist, nutze gerne verschachtelte Abfragekonstrukte, z.B. für Quantoren. Aber nur wenn es wirklich angebracht ist, nicht unnötigerweise.
-            Setze bitte immer sinnvolle Aliase, für Felder jedoch nur wenn diese sinnvoll sind und die Lesbarkeit erhöhen.
-            Setze bitte kein Semikolon am Ende.
+            Please only output the relevant SQL code, nothing else, no further comments on your part. No Markdown elements to mark the output as SQL or similar.
+            Please make sure that it is definitely a SELECT expression, even if the query requires otherwise.
+            If appropriate, feel free to use nested query constructs, e.g., for quantifiers. But only if it is really appropriate, not unnecessarily.
+            Please always set meaningful aliases, but only for fields if they are meaningful and increase readability.
+            Please do not put a semicolon at the end.
             
             """;
     
