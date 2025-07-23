@@ -1,5 +1,5 @@
-import access.JpaAccessHolder;
-import entitytype.EntityTypeSelection;
+package entitytype;
+
 import entitytype.generator.DatabaseStringGenerator;
 import entitytype.generator.DomainStringGenerator;
 import jakarta.persistence.metamodel.EntityType;
@@ -35,13 +35,6 @@ public final class EntityTypeSelectionFX implements EntityTypeSelection {
      */
     public EntityTypeSelectionFX(Set<EntityType<?>> entityTypes) {
         initializeSelectionMap(entityTypes);
-    }
-    
-    /**
-     * Erstellt ein neues Auswahl‐Objekt mit allen Entitätstypen aus dem Metamodel vorausgewählt.
-     */
-    public EntityTypeSelectionFX() {
-        this(JpaAccessHolder.get().getMetamodel().getEntities());
     }
     
     private void initializeSelectionMap(Set<EntityType<?>> entityTypes) {
