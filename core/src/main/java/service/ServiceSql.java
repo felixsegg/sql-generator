@@ -1,6 +1,8 @@
 package service;
 
 public interface ServiceSql {
+    String getDialect();
+    
     String getErrorsFor(String sql);
     
     default boolean isQuery(String sql) {

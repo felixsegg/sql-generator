@@ -3,6 +3,7 @@ package entitytype;
 import entitytype.generator.DatabaseStringGenerator;
 import entitytype.generator.DomainStringGenerator;
 import jakarta.persistence.metamodel.EntityType;
+import service.ServiceSqlImpl;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -103,8 +104,9 @@ public final class SimpleEntityTypeSelection implements EntityTypeSelection {
      */
     @Override
     public String getFullPrompt(String prompt) {
-        String context = "\nEine textuelle Repräsentation des JPA-Metamodels folgt, das dir den nötigen Kontext über das Domänenmodell, auf dem die Nutzeranfrage oben formuliert ist, gibt:\n\n" + getDomainString() + "\n\nNun folgt noch die textuelle Repräsentation des Datenbankschemas, das dir die nötigen Bezeichner der Tabellen, Spalten und weitere Informationen mit deren Hilfe du das SQL-Statement verfassen sollst, zur Verfügung stellt:\n\n" + getDatabaseString();
-        return promptPrefix + prompt + promptPostfix + context;
+        String dynamicContext = "\nThe used SQL dialect is: " + ServiceSqlImpl.getInstance().getDialect() + ".\n\nA textual representation of the JPA metamodel follows, which provides you with the necessary context about the domain model on which the user query above is formulated:\n\n" + getDomainString() + "\n\nNow follows the textual representation of the database schema, which provides you with the necessary identifiers for the tables, columns, and other information you need to write the SQL statement:\n\n" + getDatabaseString();
+        String staticContext = promptPrefix + prompt + promptPostfix;
+        return staticContext + dynamicContext;
     }
     
     /**

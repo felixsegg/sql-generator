@@ -1,33 +1,3 @@
-/*
- * Copyright (c) 2014-2025 Gregor Blasche, Daniel Borgmann, Meike Bruells,
- * Dominik Bunz, Bogdan Deynega, Tamino Elgert, Vincent Engel, Tobias Engels,
- * Stephan Fuhrmann, Katharina Gillig, Daniel Gómez Sandow, Michael Guertler,
- * Ezekiel Jason Hadi, Isis Hassel, Patrice Herstix, Lars-Werner Hoeck,
- * Simon Hofmann, Sandra Hoeltervennhoff, Frederik Hutfless, Benedikt Imbusch,
- * Fabian Keil, Maximilian Kirchner, Julia Koehne, Joris Kutzner,
- * Matthew Lavengood, Laura Mai, Justus Mairböck, Daniel Meyer, Tobias Möller,
- * Tobias Moormann, Kai Müller, Lisa Nick, Elizaveta Orlova, Moritz Rehbach,
- * Ulrich Schermuly, Kian Schmalenbach, Tobias Schneider, Felix Seggebäing,
- * Jonah Sieg, Christian Stark, Thi Minh Tam Truong, Moritz Windoffer
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
- */
 package entitytype.generator.impl;
 
 import com.google.gson.GsonBuilder;
@@ -36,26 +6,34 @@ import access.JpaAccess;
 import entitytype.generator.DatabaseStringGenerator;
 import jakarta.persistence.*;
 import jakarta.persistence.metamodel.*;
+import org.hibernate.MappingException;
+import org.hibernate.Session;
+import org.hibernate.engine.spi.SessionFactoryImplementor;
+import org.hibernate.metamodel.MappingMetamodel;
+import org.hibernate.metamodel.mapping.AttributeMapping;
+import org.hibernate.metamodel.mapping.EntityMappingType;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
-import java.sql.Connection;
-import java.sql.DatabaseMetaData;
-import java.sql.ResultSet;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Hilfsklasse zur Analyse des JPA‐Metamodels und des zugrunde liegenden Datenbankschemas.
- * Stellt JSON‐Repräsentationen bereit und ermöglicht die Auswahl von Entitätstypen
- * für die Generierung von SQL‐SELECT‐Statements.
+ * Utility class for analyzing the JPA metamodel and the underlying database schema.
+ *
+ * <p>
+ * Provides JSON representations of entity and join tables, allowing selection of relevant
+ * entity types for SQL SELECT statement generation. This class implements {@link DatabaseStringGenerator}
+ * as a singleton.
+ * </p>
  *
  * @author Felix Seggebäing
  */
 public final class DatabaseStringGeneratorImpl implements DatabaseStringGenerator {
     private static final DatabaseStringGeneratorImpl instance = new DatabaseStringGeneratorImpl();
     
-    private final JpaAccess provider = JpaAccessHolder.get();
+    private final JpaAccess access = JpaAccessHolder.get();
     
     private final Map<EntityType<?>, Map<String, Object>> entityTableInfoMap = new LinkedHashMap<>();
     private final Map<String, Map<String, Object>> joinTableInfoMap = new LinkedHashMap<>();
@@ -64,15 +42,31 @@ public final class DatabaseStringGeneratorImpl implements DatabaseStringGenerato
     private DatabaseStringGeneratorImpl() {
     }
     
+    /**
+     * Returns the singleton instance of {@link DatabaseStringGenerator}.
+     *
+     * @return the singleton instance
+     */
     public static DatabaseStringGenerator getInstance() {
         return instance;
     }
     
+    /**
+     * Generates a JSON string representation of the given set of JPA entity types and their related join tables.
+     *
+     * <p>
+     * The output includes details about entity tables and join tables.
+     * </p>
+     *
+     * @param entityTypes the set of JPA entity types to analyze; must not be {@code null}
+     * @return a pretty-printed JSON string describing the relevant tables and their structure
+     */
     @Override
     public String getDatabaseString(Set<EntityType<?>> entityTypes) {
+        if (entityTypes == null) throw new NullPointerException();
         fillMapsWithRelevantTables(entityTypes);
         
-        // Alle Tabelleninformationen sammeln
+        // collect all table information
         Map<String, Object> all = new LinkedHashMap<>();
         all.put("Entity Type Tables", getRelevantEntityTableInfos(entityTypes));
         all.put("Join Tables", getRelevantJoinTableInfos(entityTypes));
@@ -92,7 +86,7 @@ public final class DatabaseStringGeneratorImpl implements DatabaseStringGenerato
         if (secondaryTables != null) for (SecondaryTable sec : secondaryTables.value())
             if (!sec.name().isEmpty()) tables.add(sec.name());
         
-        // Fallback: Falls keine Annotation vorhanden, Standard-Tabellenname (Klassenname)
+        // fallback, if no annotation present, standard table name (class name)
         if (tables.isEmpty()) tables.add(clazz.getSimpleName());
         
         return tables;
@@ -105,7 +99,7 @@ public final class DatabaseStringGeneratorImpl implements DatabaseStringGenerato
         JoinTable jt = joinTableField.getAnnotation(JoinTable.class);
         if (!jt.name().isEmpty()) return jt.name();
         
-        // Default-Name nach Hibernate-Konvention
+        // default name as defined by Hibernate
         String owner = joinTableField.getDeclaringClass().getSimpleName();
         String target;
         if (Collection.class.isAssignableFrom(joinTableField.getType())) {
@@ -125,16 +119,16 @@ public final class DatabaseStringGeneratorImpl implements DatabaseStringGenerato
     private Set<String> getJoinTableParticipants(Field joinTableField) {
         Set<String> tables = new LinkedHashSet<>(2);
         
-        // Owner
+        // owner
         Class<?> owner = joinTableField.getDeclaringClass();
         tables.addAll(getTableNames(owner));
         
-        // Target
+        // target
         Class<?> target = null;
         if (joinTableField.getType().isAnnotationPresent(Entity.class)) {
             target = joinTableField.getType();
         } else {
-            // Typparameter prüfen, z.B. um aus Property zu extrahieren
+            // check type parameter, e.g. to extract from property
             java.lang.reflect.Type genType = joinTableField.getGenericType();
             if (genType instanceof ParameterizedType pt) {
                 for (java.lang.reflect.Type arg : pt.getActualTypeArguments()) {
@@ -142,7 +136,7 @@ public final class DatabaseStringGeneratorImpl implements DatabaseStringGenerato
                         target = clazz;
                         break;
                     }
-                    // Rekursiv weitere Verschachtelung prüfen
+                    // check further nesting
                     if (arg instanceof ParameterizedType nestedPt) {
                         for (java.lang.reflect.Type nestedArg : nestedPt.getActualTypeArguments()) {
                             if (nestedArg instanceof Class<?> nestedClazz && nestedClazz.isAnnotationPresent(Entity.class)) {
@@ -167,26 +161,26 @@ public final class DatabaseStringGeneratorImpl implements DatabaseStringGenerato
         String primaryTable = getPrimaryTableName(entityClass);
         Set<String> secondaryTables = getSecondaryTableNames(entityClass);
         
-        // Map: table name → tabellen-info
+        // Map: table name → table info
         Map<String, Map<String, Object>> tables = new LinkedHashMap<>();
         
-        // Alle möglichen Tabellen initialisieren
+        // initialize all possible tables
         tables.put(primaryTable, makeEmptyTableMap(primaryTable));
         for (String secTable : secondaryTables) {
             tables.put(secTable, makeEmptyTableMap(secTable));
         }
         
-        // Alle Felder inklusive Superklassenfelder betrachten
+        // consider all fields including super class fields
         List<Field> fields = new ArrayList<>();
         for (Class<?> c = entityClass; c != null && c != Object.class; c = c.getSuperclass()) {
             fields.addAll(Arrays.asList(c.getDeclaredFields()));
         }
         
-        // Felder den Tabellen zuordnen
+        // map fields to tables
         for (Field field : fields) {
             if (Modifier.isStatic(field.getModifiers()) || Modifier.isTransient(field.getModifiers())) continue;
             
-            // mappedBy = inverse Seite → nicht in DB!
+            // mappedBy = inverse side -> not in db!
             if ((field.isAnnotationPresent(OneToMany.class) && !field.getAnnotation(OneToMany.class).mappedBy().isEmpty()) || (field.isAnnotationPresent(ManyToMany.class) && !field.getAnnotation(ManyToMany.class).mappedBy().isEmpty()) || (field.isAnnotationPresent(OneToOne.class) && !field.getAnnotation(OneToOne.class).mappedBy().isEmpty())) {
                 continue;
             }
@@ -209,14 +203,14 @@ public final class DatabaseStringGeneratorImpl implements DatabaseStringGenerato
             colInfo.put("name", colName);
             colInfo.put("type", getSqlColumnType(entityClass, field.getName()));
             
-            // Constraints
+            // constraints
             Column columnAnn = field.getAnnotation(Column.class);
             if (columnAnn != null) {
                 colInfo.put("nullable", columnAnn.nullable());
                 colInfo.put("unique", columnAnn.unique());
                 colInfo.put("length", columnAnn.length());
             }
-            // Primary Key
+            // primary key
             if (field.isAnnotationPresent(Id.class)) {
                 colInfo.put("primaryKey", true);
                 @SuppressWarnings("unchecked") List<String> primaryKeys = (List<String>) tableInfo.get("primaryKeys");
@@ -228,11 +222,10 @@ public final class DatabaseStringGeneratorImpl implements DatabaseStringGenerato
             @SuppressWarnings("unchecked") List<Map<String, Object>> columns = (List<Map<String, Object>>) tableInfo.get("columns");
             columns.add(colInfo);
         }
-        // Join-Keys für sekundäre Tabellen setzen, damit die vertikale Partitionierung abgebildet ist
+        // set join keys for secondary tables to map vertical partitioning
         for (String secTable : secondaryTables) {
             Map<String, Object> secInfo = tables.get(secTable);
             if (secInfo != null) {
-                // Die Primärschlüssel-Spalten der Primärtabelle dienen auch als Join-Schlüssel zu SecondaryTable
                 secInfo.put("joinKeys", tables.get(primaryTable).get("primaryKeys"));
             }
         }
@@ -240,9 +233,8 @@ public final class DatabaseStringGeneratorImpl implements DatabaseStringGenerato
     }
     
     private String getTableNameForField(Field field, String primaryTable) {
-        String tableName = primaryTable; // Default: Primary Table
+        String tableName = primaryTable; // default: primary table
         
-        // Prüfe auf explizite Angabe einer SecondaryTable bei @Column(table = ...)
         if (field.isAnnotationPresent(Column.class)) {
             String colTable = field.getAnnotation(Column.class).table();
             if (!colTable.isEmpty()) tableName = colTable;
@@ -253,38 +245,27 @@ public final class DatabaseStringGeneratorImpl implements DatabaseStringGenerato
         return tableName;
     }
     
-    private String getSqlColumnType(Class<?> entityClass, String propertyName) {
-        String tableName = entityClass.getSimpleName().toUpperCase(); // besser: aus @Table
-        String columnName = propertyName.toUpperCase(); // besser: aus @Column
-        
+    public static String getSqlColumnType(Class<?> entityClass, String propertyName) {
         try {
-            Field field = entityClass.getDeclaredField(propertyName);
-            
-            Table tableAnnotation = entityClass.getAnnotation(Table.class);
-            if (tableAnnotation != null && !tableAnnotation.name().isEmpty()) {
-                tableName = tableAnnotation.name().toUpperCase();
-            }
-            
-            Column columnAnnotation = field.getAnnotation(Column.class);
-            if (columnAnnotation != null && !columnAnnotation.name().isEmpty()) {
-                columnName = columnAnnotation.name().toUpperCase();
-            }
-            
-            try (Connection conn = provider.getConnection()) {
-                DatabaseMetaData metaData = conn.getMetaData();
-                try (ResultSet rs = metaData.getColumns(null, null, tableName, columnName)) {
-                    if (rs.next()) {
-                        return rs.getString("TYPE_NAME");
-                    }
+            EntityManager em = JpaAccessHolder.get().getEntityManager();
+            Session session = em.unwrap(Session.class);
+            SessionFactoryImplementor sfi = (SessionFactoryImplementor) session.getSessionFactory();
+            MappingMetamodel mapping = sfi.getMappingMetamodel();
+            EntityMappingType entityMapping = mapping.getEntityDescriptor(entityClass);
+            if (entityMapping == null) return "UNKNOWN";
+            AttributeMapping attrMapping = entityMapping.findAttributeMapping(propertyName);
+            if (attrMapping == null) return "UNKNOWN";
+            AtomicReference<String> sqlType = new AtomicReference<>(null);
+            attrMapping.forEachSelectable((idx, selectable) -> {
+                if (sqlType.get() == null && selectable != null && selectable.getJdbcMapping() != null) {
+                    sqlType.set(selectable.getJdbcMapping().getJdbcType().getFriendlyName());
                 }
-            }
-        } catch (Exception e) {
+            });
+            return sqlType.get();
+        } catch (MappingException | IllegalArgumentException ex) {
             return "UNKNOWN";
         }
-        
-        return null;
     }
-    
     
     private Map<String, Object> makeEmptyTableMap(String tableName) {
         Map<String, Object> map = new LinkedHashMap<>();
@@ -333,15 +314,15 @@ public final class DatabaseStringGeneratorImpl implements DatabaseStringGenerato
         JoinTable jt = joinTableField.getAnnotation(JoinTable.class);
         if (jt == null) return info; // keine JoinTable-Annotation
         
-        // Tabellenname
+        // table name
         String joinTableName = getJoinTableName(joinTableField);
         info.put("tableName", joinTableName);
         
-        // Teilnehmer-Tabellen
+        // participating tables
         Set<String> participants = getJoinTableParticipants(joinTableField);
         info.put("participants", participants);
         
-        // Alle Join-Spalten (joinColumns + inverseJoinColumns zusammengefasst)
+        // all join columns (joinColumns and inverseJoinColumns)
         Set<String> allJoinColumns = new LinkedHashSet<>();
         for (JoinColumn jc : jt.joinColumns()) {
             if (!jc.name().isEmpty()) allJoinColumns.add(jc.name());
@@ -353,7 +334,6 @@ public final class DatabaseStringGeneratorImpl implements DatabaseStringGenerato
         
         return info;
     }
-    
     
     private void fillMapsWithRelevantTables(Set<EntityType<?>> entityTypes) {
         for (EntityType<?> et : entityTypes)
