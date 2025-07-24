@@ -11,6 +11,16 @@ import jakarta.persistence.metamodel.SingularAttribute;
 import java.lang.reflect.Field;
 import java.util.*;
 
+/**
+ * Utility class for generating domain-specific string representations of JPA entity types.
+ *
+ * <p>
+ * Provides JSON representations that include entity attributes, relationships, inheritance information,
+ * and other relevant domain aspects. Implements the {@link DomainStringGenerator} interface as a singleton.
+ * </p>
+ *
+ * @author Felix Seggebäing
+ */
 public final class DomainStringGeneratorImpl implements DomainStringGenerator {
     private static final DomainStringGeneratorImpl instance = new DomainStringGeneratorImpl();
     
@@ -18,11 +28,24 @@ public final class DomainStringGeneratorImpl implements DomainStringGenerator {
     
     private DomainStringGeneratorImpl() {}
     
+    /**
+     * Returns the singleton instance of {@link DomainStringGeneratorImpl}.
+     *
+     * @return the singleton instance
+     */
     public static DomainStringGeneratorImpl getInstance() {
         return instance;
     }
     
-    @Override public String getDomainString(Set<EntityType<?>> entityTypes) {
+    /**
+     * Generates a JSON string representation of the given set of JPA entity types,
+     * including attributes, relationships, and inheritance information.
+     *
+     * @param entityTypes the set of JPA entity types to analyze; must not be {@code null}
+     * @return a pretty-printed JSON string describing the domain structure of the entities
+     */
+    @Override
+    public String getDomainString(Set<EntityType<?>> entityTypes) {
         List<Map<String, Object>> entities = new ArrayList<>();
         for (EntityType<?> et : entityTypes) {
             if (!entityTypeInfoMap.containsKey(et)) entityTypeInfoMap.put(et, getEntityInfo(et));
@@ -37,20 +60,20 @@ public final class DomainStringGeneratorImpl implements DomainStringGenerator {
         
         entityInfo.put("entityTypeName", entity.getName());
         
-        // Auf Vererbung checken
+        // check for inheritance
         if (entity.getJavaType().getSuperclass().isAnnotationPresent(Entity.class)) {
             entityInfo.put("superclassEntity", entity.getJavaType().getSuperclass().getSimpleName());
             entityInfo.put("inheritanceType", getInheritanceType(entity));
         }
         
-        // Attribut-Infos hinzufügen, getrennt für einfache Attribute und solche, die eine Beziehung darstellen.
+        // add attribute infos
         List<Map<String, Object>> simpleAttributes = new ArrayList<>();
         List<Map<String, Object>> relationshipAttributes = new ArrayList<>();
         for (Attribute<?, ?> attr : entity.getAttributes()) {
-            // Wesentliche Informationen extrahieren
+            // general infos
             Map<String, Object> attrInfo = getAttributeInfo(attr);
             
-            // Fallunterscheidung zwischen einfachen und Beziehungsattributen
+            // discriminate between regular and relationship attributes
             if (attr.isAssociation()) {
                 attrInfo.put("isMappingSideInDB", isOwningSide(attr));
                 relationshipAttributes.add(attrInfo);
@@ -91,7 +114,7 @@ public final class DomainStringGeneratorImpl implements DomainStringGenerator {
             ManyToMany manyToMany = field.getAnnotation(ManyToMany.class);
             ManyToOne manyToOne = field.getAnnotation(ManyToOne.class);
             
-            // Wenn @ManyToOne vorhanden ist, dann ist es immer die mappende Seite
+            // if @ManyToOne is present it's always the mapping side
             if (joinTable != null) return false;
             else if (manyToOne != null) return true;
             else if (oneToOne != null) return oneToOne.mappedBy().isEmpty();
@@ -106,20 +129,19 @@ public final class DomainStringGeneratorImpl implements DomainStringGenerator {
     private InheritanceType getInheritanceType(EntityType<?> entity) {
         Class<?> entityClass = entity.getJavaType();
         
-        // Falls die Klasse eine MappedSuperclass ist, gibt es keine eigene Vererbungsstrategie
+        //  if the class is a MappedSuperclass, there is no inheritance strategy
         boolean isMappedSuperclass = entityClass.isAnnotationPresent(MappedSuperclass.class);
         
-        // Durchlaufe die Klassenhierarchie, um geerbte Strategie zu finden
+        // iterate through inheritance hierarchy
         while (entityClass != Object.class) {
             if (entityClass.isAnnotationPresent(Entity.class) && entityClass.getAnnotation(Inheritance.class) != null)
                 return entityClass.getAnnotation(Inheritance.class).strategy(); // Falls gefunden, direkt zurückgeben
-            
-            // Beende, falls die Superklasse keine Entity ist
+          
             entityClass = entityClass.getSuperclass();
             if (entityClass == null) return isMappedSuperclass ? null : InheritanceType.SINGLE_TABLE; // Standardwert
         }
         
-        // Falls keine Strategie gefunden wurde, aber eine Entity vorhanden ist, verwende Standardwert
+        // default is nothing is explicitly set
         return InheritanceType.SINGLE_TABLE;
     }
 }

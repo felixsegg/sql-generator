@@ -23,11 +23,28 @@ import javafx.util.Duration;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 
+/**
+ * Utility class for common JavaFX operations used throughout the library.
+ *
+ * <p>
+ * Provides helper methods for signaling UI element borders, enabling zoom and pan behavior
+ * for images in scroll panes, and creating modal popup windows.
+ * </p>
+ *
+ * <p>
+ * All methods are static and the class is not intended to be instantiated.
+ * </p>
+ *
+ * @author Felix Seggebäing
+ */
 public class FXUtil {
     /**
-     * Lässt den Rand des übergebenen GUI-Elements rot blinken.
+     * Temporarily highlights the border of the given JavaFX node by making it flash red.
+     * <p>
+     * Intended to draw the user's attention to a specific UI element (e.g., in case of invalid input).
+     * The border will return to its default style after the animation completes.
      *
-     * @param node das GUI-Element, auf das aufmerksam gemacht werden soll
+     * @param node the JavaFX UI element to signal
      */
     public static void signalBorder(Node node) {
         Timeline timeline = new Timeline(
@@ -48,31 +65,17 @@ public class FXUtil {
     }
     
     /**
-     * Initialisiert eine gegebene ScrollPane so, dass darin ein Bild per Mausrad und
-     * Tastatur (STRG + PLUS / MINUS) gezoomt und verschoben (panning) werden kann.
+     * Initializes the given {@link ScrollPane} so that it supports zooming and panning for images.
      * <p>
-     * Dabei wird ein {@link ImageView} mit beibehaltenem Seitenverhältnis in einer
-     * {@link Group} als Inhalt der ScrollPane gesetzt. Die Zoom-Stufen werden durch
-     * eine dynamisch berechnete minimale Skalierung (minScale) begrenzt, die dafür sorgt,
-     * dass das Bild immer vollständig in den aktuellen Viewport passt (maximal herausgezoomt),
-     * während die maximale Skalierung (maxScale) arbiträr auf 4x festgelegt ist.
+     * Sets up an {@link ImageView} inside a {@link Group} as the scroll pane's content.
+     * Enables smooth zooming via mouse wheel (with Ctrl), keyboard shortcuts (Ctrl + Plus/Minus), and panning via mouse drag.
+     * The zoom level is dynamically limited so that the image always fits in the viewport (minScale) and cannot exceed 4x zoom (maxScale).
      * <p>
-     * Folgende Features werden bereitgestellt:
-     * <ul>
-     *   <li>Automatische Neuberechnung von minScale bei Änderung der Viewport-Größe
-     *       (Listener auf viewportBoundsProperty).</li>
-     *   <li>Initiales Herauszoomen, sobald ein neues Bild gesetzt wird
-     *       (Listener auf imageProperty des ImageView): scale wird auf minScale gesetzt.</li>
-     *   <li>Mausrad-Zoom (STRG gedrückt) mit stufenweiser Skalierung um Faktor ±10 %.</li>
-     *   <li>Tastatur-Zoom über STRG + PLUS/EQUALS (reinzoomen) und STRG + MINUS
-     *       (herauszoomen), ebenfalls ±10 % pro Tastendruck.</li>
-     *   <li>Panning der Bildansicht durch Ziehen innerhalb der ScrollPane.</li>
-     * </ul>
+     * Returns a {@link Consumer} that can be used to set a new {@link Image} in the zoomable view,
+     * automatically resetting the zoom to the minimum scale so the image fits.
      *
-     * @param scrollPane Die ScrollPane, die als Container für das zoom- und panning-fähige Bild dienen soll.
-     * @return Ein {@code Consumer<Image>}, der beim Aufruf das übergebene {@link Image} in das
-     * zugeordnete {@link ImageView} einfügt und dabei automatisch auf die kleinstmögliche
-     * Zoom-Stufe (minScale) einstellt.
+     * @param scrollPane the {@link ScrollPane} to be initialized for zoom and pan functionality
+     * @return a consumer that displays an image in the scroll pane and resets zoom
      */
     
     public static Consumer<Image> initializeZoomableScrollPane(ScrollPane scrollPane) {
@@ -142,6 +145,18 @@ public class FXUtil {
         return imageView::setImage;
     }
     
+    /**
+     * Creates and configures a modal popup {@link Stage} with the specified content and positioning.
+     * <p>
+     * The popup is centered with the given offsets relative to the parent window and uses {@link Modality#WINDOW_MODAL}.
+     *
+     * @param parent   the parent window for modality and positioning
+     * @param content  the content to display in the popup
+     * @param offsetX  the horizontal offset from the parent window's X position
+     * @param offsetY  the vertical offset from the parent window's Y position
+     * @param title    the window title for the popup
+     * @return the configured and ready-to-show modal {@link Stage}
+     */
     public static Stage createModalPopup(Window parent, Parent content, double offsetX, double offsetY, String title) {
         Stage popup = new Stage();
         popup.initOwner(parent);

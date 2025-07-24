@@ -13,8 +13,21 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * Hilfsklasse, die die Auswahl von Entitätstypen verwaltet und
- * den vollständigen Prompt für die SQL‐Generierung zusammenstellt.
+ * JavaFX-aware data structure for managing the selection state of a set of JPA entity types,
+ * including configuration for prompt generation and string representation.
+ *
+ * <p>
+ * Uses {@link BooleanProperty} for each entity type to enable property binding and change observation
+ * in JavaFX-based user interfaces. Supports the same configuration and prompt assembly features
+ * as {@link EntityTypeSelection}, adapted for UI interaction.
+ * </p>
+ *
+ * <p>
+ * Provides methods to select and deselect entity types, configure domain and database string generators,
+ * and assemble prompts for SQL query generation that include both domain and database context.
+ * </p>
+ *
+ * @author Felix Seggebäing
  */
 public final class EntityTypeSelectionFX implements EntityTypeSelection {
     // Default values
@@ -30,9 +43,10 @@ public final class EntityTypeSelectionFX implements EntityTypeSelection {
     private final Map<EntityType<?>, BooleanProperty> selectionMap = new LinkedHashMap<>();
     
     /**
-     * Erstellt ein neues Auswahl‐Objekt mit allen Entitätstypen vorausgewählt.
+     * Creates a new selection object with all provided entity types initially selected,
+     * and sets up observable properties for use in JavaFX user interfaces.
      *
-     * @param entityTypes die Menge der im zu berücksichtigenden Entitätstypen
+     * @param entityTypes the set of JPA entity types to manage; all will be pre-selected
      */
     public EntityTypeSelectionFX(Set<EntityType<?>> entityTypes) {
         initializeSelectionMap(entityTypes);
@@ -49,16 +63,41 @@ public final class EntityTypeSelectionFX implements EntityTypeSelection {
         });
     }
     
+    /**
+     * Sets the {@link DomainStringGenerator} to use for generating the domain string representation.
+     * <p>
+     * If not set, the default generator {@link #DEF_DOMAIN_STRING_GENERATOR} is used.
+     * </p>
+     *
+     * @param domainStringGenerator the generator to use
+     */
     @Override
     public void setDomainStringGenerator(DomainStringGenerator domainStringGenerator) {
         this.domainStringGenerator = domainStringGenerator;
     }
     
+    /**
+     * Sets the {@link DatabaseStringGenerator} to use for generating the database string representation.
+     * <p>
+     * If not set, the default generator {@link #DEF_DATABASE_STRING_GENERATOR} is used.
+     * </p>
+     *
+     * @param databaseStringGenerator the generator to use
+     */
     @Override
     public void setDatabaseStringGenerator(DatabaseStringGenerator databaseStringGenerator) {
         this.databaseStringGenerator = databaseStringGenerator;
     }
     
+    /**
+     * Sets the prefix and postfix used for assembling prompts in SQL query generation.
+     * <p>
+     * If not set, the defaults {@link #DEF_PROMPT_PREFIX} and {@link #DEF_PROMPT_POSTFIX} are used.
+     * </p>
+     *
+     * @param promptPrefix  the prefix to use in the prompt
+     * @param promptPostfix the postfix to use in the prompt
+     */
     @Override
     public void setPromptPrePostfix(String promptPrefix, String promptPostfix) {
         this.promptPrefix = promptPrefix;
@@ -66,25 +105,29 @@ public final class EntityTypeSelectionFX implements EntityTypeSelection {
     }
     
     /**
-     * Gibt die BooleanProperty zurück, mit der die Selektion eines Entitätstyps
-     * beobachtet oder geändert werden kann.
+     * Returns the {@link BooleanProperty} associated with the given entity type,
+     * allowing selection state to be observed or modified in JavaFX.
      *
-     * @param et der jeweilige {@link EntityType}, darf nicht null sein
-     * @return die zugehörige {@link BooleanProperty}
-     * @throws IllegalArgumentException falls der Typ nicht verwaltet wird
+     * @param et the entity type for which the property is requested; must not be {@code null}
+     * @return the {@link BooleanProperty} for the given entity type
+     * @throws NullPointerException     if {@code et} is {@code null}
+     * @throws IllegalArgumentException if {@code et} is not managed by this selection
      */
     public BooleanProperty getBooleanPropertyForEntityType(EntityType<?> et) {
-        if (et == null || !selectionMap.containsKey(et))
-            throw new IllegalArgumentException("Key is either null or not in map.");
+        if (et == null)
+            throw new NullPointerException();
+        if (!selectionMap.containsKey(et))
+            throw new IllegalArgumentException("Key is not in the map.");
         else return selectionMap.get(et);
     }
     
     /**
-     * Gibt zurück, ob ein Entitätstyp ausgewählt ist.
+     * Checks whether the given JPA entity type is currently selected.
      *
-     * @param entityType der jeweilige {@link EntityType}, darf nicht null sein
-     * @return {@code true} if selected, {@code false} else.
-     * @throws IllegalArgumentException falls der Typ nicht verwaltet wird
+     * @param entityType the entity type to check; must not be {@code null}
+     * @return {@code true} if the entity type is selected, {@code false} otherwise
+     * @throws NullPointerException     if {@code entityType} is {@code null}
+     * @throws IllegalArgumentException if {@code entityType} is not managed by this selection
      */
     @Override
     public boolean isEntityTypeSelected(EntityType<?> entityType) {
@@ -95,6 +138,14 @@ public final class EntityTypeSelectionFX implements EntityTypeSelection {
         else return selectionMap.get(entityType).get();
     }
     
+    /**
+     * Sets the selection state of the given JPA entity type.
+     *
+     * @param entityType the entity type to modify; must not be {@code null}
+     * @param selected   {@code true} to select the entity type, {@code false} to deselect it
+     * @throws NullPointerException     if {@code entityType} is {@code null}
+     * @throws IllegalArgumentException if {@code entityType} is not managed by this selection
+     */
     @Override
     public void setEntityTypeSelected(EntityType<?> entityType, boolean selected) {
         if (entityType == null)
@@ -105,9 +156,9 @@ public final class EntityTypeSelectionFX implements EntityTypeSelection {
     }
     
     /**
-     * Liefert alle Entitätstypen, die grundsätzlich im Auswahl‐Objekt enthalten sind.
+     * Returns all JPA entity types managed by this selection object, regardless of their selection state.
      *
-     * @return Set aller verwalteten {@link EntityType}
+     * @return a set of all managed entity types
      */
     @Override
     public Set<EntityType<?>> getEntityTypes() {
@@ -115,11 +166,16 @@ public final class EntityTypeSelectionFX implements EntityTypeSelection {
     }
     
     /**
-     * Erstellt den kompletten Prompt für die SQL‐Generierung, bestehend aus
-     * dem benutzerdefinierten Text und den JSON‐Repräsentationen von Metamodel und Schema.
+     * Assembles the full prompt for SQL query generation by combining the configured prefix, the user-defined prompt,
+     * the postfix, the SQL dialect, the domain string, and the database string.
      *
-     * @param prompt die menschlich formulierte Abfrage
-     * @return vollständiger Prompt für den SQL‐Generator
+     * <p>
+     * The resulting prompt consists of: the prefix, the user-provided prompt, the postfix, a note on the current SQL dialect,
+     * the domain string (from {@link DomainStringGenerator}), and the database string (from {@link DatabaseStringGenerator}).
+     * </p>
+     *
+     * @param prompt the user-defined prompt content
+     * @return the complete prompt string including all configured and generated parts
      */
     @Override
     public String getFullPrompt(String prompt) {
@@ -129,9 +185,9 @@ public final class EntityTypeSelectionFX implements EntityTypeSelection {
     }
     
     /**
-     * Prüft, ob alle Entitätstypen aktuell ausgewählt sind.
+     * Checks whether all managed entity types are currently selected.
      *
-     * @return true, falls alle ausgewählt sind; false sonst
+     * @return {@code true} if all entity types are selected, {@code false} otherwise
      */
     @Override
     public boolean areAllSelected() {
@@ -155,9 +211,9 @@ public final class EntityTypeSelectionFX implements EntityTypeSelection {
     }
     
     /**
-     * Liefert die gerade ausgewählten Entitätstypen.
+     * Returns the set of entity types that are currently selected.
      *
-     * @return Set der ausgewählten {@link EntityType}
+     * @return a set containing all currently selected entity types
      */
     @Override
     public Set<EntityType<?>> getSelectedEntityTypes() {
@@ -165,7 +221,7 @@ public final class EntityTypeSelectionFX implements EntityTypeSelection {
     }
     
     /**
-     * Markiert alle Entitätstypen als ausgewählt.
+     * Selects all managed entity types.
      */
     @Override
     public void selectAll() {
@@ -173,10 +229,10 @@ public final class EntityTypeSelectionFX implements EntityTypeSelection {
     }
     
     /**
-     * Hebt die Auswahl für alle Entitätstypen auf.
+     * Deselects all managed entity types.
      */
     @Override
-    public void unselectAll() {
+    public void deselectAll() {
         selectionMap.keySet().forEach(et -> selectionMap.get(et).set(false));
     }
 }

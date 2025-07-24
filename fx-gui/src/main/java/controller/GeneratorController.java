@@ -34,6 +34,22 @@ import java.util.Set;
 import java.util.concurrent.Future;
 import java.util.function.Consumer;
 
+/**
+ * JavaFX controller for the SQL generator user interface.
+ *
+ * <p>
+ * Manages user interactions, prompt assembly, entity type selection, help dialogs,
+ * and validation/testing of generated SQL queries. Connects the UI to the application’s
+ * backend services and domain model.
+ * </p>
+ *
+ * <p>
+ * Handles initialization of UI controls, binds entity selection to observable properties,
+ * provides help functionality, and manages the workflow for prompt editing and query validation.
+ * </p>
+ *
+ * @author Felix Seggebäing
+ */
 public class GeneratorController implements Initializable {
     @FXML
     private Label promptHelpLabel, entityTypeHelpLabel;
@@ -51,6 +67,16 @@ public class GeneratorController implements Initializable {
     
     private final SimpleStringFuture result = new SimpleStringFuture();
     
+    /**
+     * Initializes the controller after its root element has been completely processed.
+     * <p>
+     * This method is intended to be called by the JavaFX framework, not by user code.
+     * Sets up the entity type selection, configures tooltips, and initializes help labels.
+     * </p>
+     *
+     * @param url the location used to resolve relative paths for the root object, or {@code null} if not known
+     * @param resourceBundle the resources used to localize the root object, or {@code null} if not used
+     */
     @Override
     public void initialize(URL url, ResourceBundle resourceBundle) {
         Set<EntityType<?>> entityTypes = access.getMetamodel().getEntities();
@@ -80,7 +106,7 @@ public class GeneratorController implements Initializable {
         selectAllCheckBox.setSelected(true);
         selectAllCheckBox.setOnAction(e -> {
             if (selectAllCheckBox.isSelected()) selection.selectAll();
-            else selection.unselectAll();
+            else selection.deselectAll();
         });
     }
     
@@ -199,6 +225,11 @@ public class GeneratorController implements Initializable {
         popup.show();
     }
     
+    /**
+     * Returns a {@link Future} that will be completed with the generated SQL query or cancelled if the operation is aborted.
+     *
+     * @return a future representing the result of the SQL generation process
+     */
     public Future<String> getResult() {
         return result;
     }

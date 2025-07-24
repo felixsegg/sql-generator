@@ -16,16 +16,45 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * Utility class for generating UML diagram images from a set of JPA entity types.
+ *
+ * <p>
+ * Produces PlantUML-based diagrams that visualize entities, relationships, and inheritance.
+ * Implements the {@link UMLGenerator} interface as a singleton.
+ * </p>
+ *
+ * @author Felix Seggebäing
+ */
 public final class UMLGeneratorImpl implements UMLGenerator {
     private static final UMLGeneratorImpl instance = new UMLGeneratorImpl();
     
     private UMLGeneratorImpl() {}
     
+    /**
+     * Returns the singleton instance of {@link UMLGeneratorImpl}.
+     *
+     * @return the singleton instance
+     */
     public static UMLGeneratorImpl getInstance() {
         return instance;
     }
     
-    @Override public InputStream getGraphImageStream(Set<EntityType<?>> entityTypes) {
+    /**
+     * Generates a UML diagram image stream for the given set of JPA entity types.
+     *
+     * <p>
+     * The diagram includes entities, their relationships, and inheritance, and is returned as an {@link InputStream}
+     * containing the image data.
+     * </p>
+     *
+     * @param entityTypes the set of JPA entity types to visualize; must not be {@code null}
+     * @return an {@link InputStream} containing the UML diagram image data, or {@code null} if generation fails
+     * @throws NullPointerException if {@code entityTypes} is {@code null}
+     */
+    @Override
+    public InputStream getGraphImageStream(Set<EntityType<?>> entityTypes) {
+        if (entityTypes == null) throw new NullPointerException();
         String plantUmlSource = generatePlantUmlSource(entityTypes);
         ByteArrayOutputStream os = new ByteArrayOutputStream();
         SourceStringReader reader = new SourceStringReader(plantUmlSource);

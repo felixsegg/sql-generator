@@ -9,16 +9,45 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
 
+/**
+ * Concrete implementation of {@link AbstractServiceSql} that validates and executes SQL queries
+ * using the application's configured JPA and Hibernate infrastructure.
+ *
+ * <p>
+ * Provides dialect detection by introspecting the underlying Hibernate {@link SessionFactoryImplementor},
+ * and executes test queries using JDBC connections managed by {@link JpaAccessHolder}.
+ * </p>
+ *
+ * <p>
+ * Intended as a singleton; use {@link #getInstance()} to access the shared instance.
+ * </p>
+ *
+ * @author Felix Seggebäing
+ */
 public class ServiceSqlImpl extends AbstractServiceSql {
     private static final ServiceSql instance = new ServiceSqlImpl();
     
     private ServiceSqlImpl() {
     }
     
+    /**
+     * Returns the singleton instance of {@link ServiceSqlImpl}.
+     *
+     * @return the shared {@link ServiceSql} instance
+     */
     public static ServiceSql getInstance() {
         return instance;
     }
     
+    /**
+     * Executes the given SQL query using a JDBC connection obtained from {@link JpaAccessHolder}.
+     * <p>
+     * Used internally to validate or test the provided SQL query.
+     * </p>
+     *
+     * @param sql the SQL query to execute
+     * @throws SQLException if an error occurs during query execution
+     */
     @Override
     protected void testExecuteQuery(String sql) throws SQLException {
         try (Connection con = JpaAccessHolder.get().getConnection(); Statement statement = con.createStatement()) {
