@@ -107,7 +107,7 @@ Originally part of a Bachelor thesis at the Institute for Computer Science of th
 
 API documentation for the modules: 
 
-- Core functionality without GUI framework dependency: [core Javadoc](docs/core/index.html)
-- Additional JavaFX logic support (bindable BooleanProperties in type selection object): [fx-logic Javadoc](docs/fx-logic/index.html)
-- Fully functional JavaFX GUI: [fx-gui Javadoc](docs/fx-gui/index.html)
+- Core functionality without GUI framework dependency: [core Javadoc](https://felixsegg.github.io/sql-generator/core/)
+- Additional JavaFX logic support (bindable BooleanProperties in type selection object): [fx-logic Javadoc](https://felixsegg.github.io/sql-generator/fx-logic/)
+- Fully functional JavaFX GUI: [fx-gui Javadoc](https://felixsegg.github.io/sql-generator/fx-gui/)
 
