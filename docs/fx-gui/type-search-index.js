@@ -1,0 +1,1 @@
+typeSearchIndex = [{"l":"All Classes and Interfaces","u":"allclasses-index.html"},{"p":"util","l":"FXUtil"},{"p":"controller","l":"GeneratorController"},{"p":"util","l":"SimpleStringFuture"}];updateSearchResults();

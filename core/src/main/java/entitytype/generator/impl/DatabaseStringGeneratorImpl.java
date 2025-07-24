@@ -245,7 +245,7 @@ public final class DatabaseStringGeneratorImpl implements DatabaseStringGenerato
         return tableName;
     }
     
-    public static String getSqlColumnType(Class<?> entityClass, String propertyName) {
+    private static String getSqlColumnType(Class<?> entityClass, String propertyName) {
         try {
             EntityManager em = JpaAccessHolder.get().getEntityManager();
             Session session = em.unwrap(Session.class);
